@@ -50,10 +50,10 @@ if __name__ == '__main__':
     # weights
     # L1
     n_hidden_1 = 200
-    W1_mu = tf.Variable(tf.truncated_normal([n_input, n_hidden_1], stddev=0.01))
+    W1_mu = tf.Variable(tf.truncated_normal([n_input, n_hidden_1], stddev=0.01), name='w1m')
     W1_logsigma = tf.Variable(tf.truncated_normal([n_input, n_hidden_1], stddev=0.01)) #CHRIS change stddev
     b1_mu = tf.Variable(tf.zeros([n_hidden_1])) #CHRIS can change
-    b1_logsigma = theano.shared(value=init((n_hidden_1,)))
+    b1_logsigma = tf.Variable(tf.zeros([n_hidden_1]))
 
     # L2
     n_hidden_2 = 200
@@ -77,24 +77,24 @@ if __name__ == '__main__':
         epsilon_w1 = get_random((n_input, n_hidden_1), avg=0., std=sigma_prior)
         epsilon_b1 = get_random((n_hidden_1,), avg=0., std=sigma_prior)
 
-        W1 = W1_mu + tf.mul(tf.log(1. + T.exp(W1_logsigma)), epsilon_w1)
-        b1 = b1_mu + tf.mul(tf.log(1. + T.exp(b1_logsigma)), epsilon_b1)
+        W1 = W1_mu + tf.mul(tf.log(1. + tf.exp(W1_logsigma)), epsilon_w1)
+        b1 = b1_mu + tf.mul(tf.log(1. + tf.exp(b1_logsigma)), epsilon_b1)
 
         epsilon_w2 = get_random((n_hidden_1, n_hidden_2), avg=0., std=sigma_prior)
         epsilon_b2 = get_random((n_hidden_2,), avg=0., std=sigma_prior)
 
-        W2 = W2_mu + tf.mul(tf.log(1. + T.exp(W2_logsigma)), epsilon_w2)
-        b2 = b2_mu + tf.mul(tf.log(1. + T.exp(b2_logsigma)), epsilon_b2)
+        W2 = W2_mu + tf.mul(tf.log(1. + tf.exp(W2_logsigma)), epsilon_w2)
+        b2 = b2_mu + tf.mul(tf.log(1. + tf.exp(b2_logsigma)), epsilon_b2)
 
         epsilon_w3 = get_random((n_hidden_2, n_output), avg=0., std=sigma_prior)
         epsilon_b3 = get_random((n_output,), avg=0., std=sigma_prior)
 
-        W3 = W3_mu + tf.mul(tf.log(1. + T.exp(W3_logsigma)), epsilon_w3)
-        b3 = b3_mu + tf.mul(tf.log(1. + T.exp(b3_logsigma)), epsilon_b3)
+        W3 = W3_mu + tf.mul(tf.log(1. + tf.exp(W3_logsigma)), epsilon_w3)
+        b3 = b3_mu + tf.mul(tf.log(1. + tf.exp(b3_logsigma)), epsilon_b3)
 
         a1 = nonlinearity(tf.matmul(x, W1) + b1)
         a2 = nonlinearity(tf.matmul(a1, W2) + b2)
-        h = T.nnet.softmax(nonlinearity(tf.matmul(a2, W3) + b3))
+        h = tf.nn.softmax(nonlinearity(tf.matmul(a2, W3) + b3))
 
         sample_log_pw, sample_log_qw, sample_log_likelihood = 0., 0., 0.
 
@@ -124,75 +124,35 @@ if __name__ == '__main__':
 
     batch_size = 100
     n_batches = M / float(batch_size)
+    n_train_batches = int(train_data.shape[0] / float(batch_size))
 
     objective = tf.reduce_sum((1. / n_batches) * (log_qw - log_pw) - log_likelihood) / float(batch_size)
-
+    
     # updates
     optimizer = tf.train.AdamOptimizer(learning_rate)
     optimize = optimizer.minimize(objective)
 
+    a1_mu = nonlinearity(tf.matmul(x, W1_mu) + b1_mu)
+    a2_mu = nonlinearity(tf.matmul(a1_mu, W2_mu) + b2_mu)
+    h_mu = tf.nn.softmax(nonlinearity(tf.matmul(a2_mu, W3_mu) + b3_mu))
 
-########
-    i = T.iscalar()
+    # Test trained model
+    correct_prediction = tf.equal(tf.argmax(h_mu, 1), tf.argmax(y, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))/ float(test_data.shape[0])
+    
+    sess = tf.InteractiveSession()
+    tf.global_variables_initializer().run()
 
-    train_data = theano.shared(np.asarray(train_data, dtype=theano.config.floatX))
-    train_target = theano.shared(np.asarray(train_target, dtype=theano.config.floatX))
-
-    train_function = theano.function(
-        inputs=[i],
-        outputs=objective,
-        updates=updates,
-        givens={
-            x: train_data[i * batch_size: (i + 1) * batch_size],
-            y: train_target[i * batch_size: (i + 1) * batch_size]
-        }
-    )
-
-    a1_mu = nonlinearity(T.dot(x, W1_mu) + b1_mu)
-    a2_mu = nonlinearity(T.dot(a1_mu, W2_mu) + b2_mu)
-    h_mu = T.nnet.softmax(nonlinearity(T.dot(a2_mu, W3_mu) + b3_mu))
-
-    output_function = theano.function([x], T.argmax(h_mu, axis=1))
-
-    n_train_batches = int(train_data.get_value().shape[0] / float(batch_size))
-
-    # and finally, training loop
-    for e in xrange(n_epochs):
+    for n in range(n_epochs):
         errs = []
-        for b in xrange(n_train_batches):
-            batch_err = train_function(b)
-            errs.append(batch_err)
-        out = output_function(test_data)
-        acc = np.count_nonzero(output_function(test_data) == np.int32(test_target.ravel())) / float(test_data.shape[0])
-print 'epoch', e, 'cost', np.mean(errs), 'Accuracy', acc
-################################################################################################################
+        for i in xrange(n_train_batches):
+            errs.append(optimize)
+            sess.run([objective, optimize], feed_dict={            
+	    		x: train_data[i * batch_size: (i + 1) * batch_size],
+            		y: train_target[i * batch_size: (i + 1) * batch_size]})
+    	sess.run(accuracy, feed_dict={x: test_data, y: test_target})
+	print 'epoch', n, 'cost', np.mean(errs), 'Accuracy', accuracy
 
 
-x = tf.placeholder(tf.float32, [None, 784])
 
 
-W = tf.Variable(tf.zeros([784, 10]))
-b = tf.Variable(tf.zeros([10]))
-
-y = tf.nn.softmax(tf.matmul(x, W) + b)
-
-y_ = tf.placeholder(tf.float32, [None, 10])
-
-cross_entropy = tf.reduce_mean(-tf.reduce_sum(y_ * tf.log(y), reduction_indices=[1]))
-
-train_step = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
-
-sess = tf.InteractiveSession()
-
-tf.global_variables_initializer().run()
-
-for _ in range(1000):
-  batch_xs, batch_ys = mnist.train.next_batch(100)
-  sess.run(train_step, feed_dict={x: batch_xs, y_: batch_ys})
-
-
-# Test trained model
-  correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
-  accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-  print(sess.run(accuracy, feed_dict={x: mnist.test.images,
-y_: mnist.test.labels}))
