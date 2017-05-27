@@ -140,8 +140,9 @@ if __name__ == '__main__':
     correct_prediction = tf.equal(tf.argmax(h_mu, 1), tf.argmax(y, 1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))/ float(test_data.shape[0])
     
-    sess = tf.InteractiveSession()
-    tf.global_variables_initializer().run()
+    sess = tf.Session()
+    init = tf.initialize_all_variables()
+    sess.run(init)
 
     for n in range(n_epochs):
         errs = []
@@ -151,7 +152,7 @@ if __name__ == '__main__':
 	    		x: train_data[i * batch_size: (i + 1) * batch_size],
             		y: train_target[i * batch_size: (i + 1) * batch_size]})
     	sess.run(accuracy, feed_dict={x: test_data, y: test_target})
-	print 'epoch', n, 'cost', np.mean(errs), 'Accuracy', accuracy
+	print 'epoch', n, 'cost', errs, 'Accuracy', accuracy
 
 
 
