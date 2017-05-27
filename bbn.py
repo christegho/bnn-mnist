@@ -1,4 +1,5 @@
 import tensorflow as tf
+tf.logging.set_verbosity(tf.logging.INFO)
 from sklearn.datasets import fetch_mldata
 from sklearn.cross_validation import train_test_split
 from sklearn import preprocessing
@@ -135,10 +136,12 @@ if __name__ == '__main__':
     a1_mu = nonlinearity(tf.matmul(x, W1_mu) + b1_mu)
     a2_mu = nonlinearity(tf.matmul(a1_mu, W2_mu) + b2_mu)
     h_mu = tf.nn.softmax(nonlinearity(tf.matmul(a2_mu, W3_mu) + b3_mu))
+    pred = tf.argmax(h_mu, 1)
+
 
     # Test trained model
-    correct_prediction = tf.equal(tf.argmax(h_mu, 1), tf.argmax(y, 1))
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))/ float(test_data.shape[0])
+    #correct_prediction = tf.equal(tf.argmax(h_mu, 1), tf.argmax(y, 1))
+    #accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))/ float(test_data.shape[0])
     
     sess = tf.Session()
     init = tf.initialize_all_variables()
@@ -147,12 +150,13 @@ if __name__ == '__main__':
     for n in range(n_epochs):
         errs = []
         for i in xrange(n_train_batches):
-            errs.append(optimize)
-            sess.run([objective, optimize], feed_dict={            
+            ob = sess.run([objective, optimize], feed_dict={            
 	    		x: train_data[i * batch_size: (i + 1) * batch_size],
             		y: train_target[i * batch_size: (i + 1) * batch_size]})
-    	sess.run(accuracy, feed_dict={x: test_data, y: test_target})
-	print 'epoch', n, 'cost', errs, 'Accuracy', accuracy
+            errs.append(ob[0])
+    	predictions = sess.run(pred, feed_dict={x: test_data})
+	acc = np.count_nonzero(predictions == np.int32(test_target.ravel())) / float(test_data.shape[0])
+	print 'epoch', n, 'Accuracy', acc, 'loss', np.mean(errs)
 
 
 
