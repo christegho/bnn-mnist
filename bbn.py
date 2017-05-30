@@ -44,31 +44,31 @@ if __name__ == '__main__':
     n_input = train_data.shape[1]
     M = train_data.shape[0]
     sigma_prior = tf.exp(-3.0)
-    n_samples = 50
+    n_samples = 3
     learning_rate = 0.001
     n_epochs = 100
 
-    stddev_var = 0.01
+    stddev_var = 0.1
 
     # weights
     # L1
     n_hidden_1 = 200
     W1_mu = tf.Variable(tf.truncated_normal([n_input, n_hidden_1], stddev=stddev_var))
-    W1_logsigma = tf.Variable(tf.truncated_normal([n_input, n_hidden_1], stddev=stddev_var)) 
+    W1_logsigma = tf.Variable(tf.truncated_normal([n_input, n_hidden_1], mean=1.0, stddev=stddev_var)) 
     b1_mu = tf.Variable(tf.zeros([n_hidden_1])) #CHRIS can change
     b1_logsigma = tf.Variable(tf.zeros([n_hidden_1]))
 
     # L2
     n_hidden_2 = 200
     W2_mu = tf.Variable(tf.truncated_normal([n_hidden_1, n_hidden_2], stddev=stddev_var))
-    W2_logsigma = tf.Variable(tf.truncated_normal([n_hidden_1, n_hidden_2], stddev=stddev_var))
+    W2_logsigma = tf.Variable(tf.truncated_normal([n_hidden_1, n_hidden_2], mean=1.0, stddev=stddev_var))
     b2_mu = tf.Variable(tf.zeros([n_hidden_2])) 
     b2_logsigma = tf.Variable(tf.zeros([n_hidden_2])) 
 
     # L3
     n_output = 10
     W3_mu = tf.Variable(tf.truncated_normal([n_hidden_2, n_output], stddev=stddev_var))
-    W3_logsigma = tf.Variable(tf.truncated_normal([n_hidden_2, n_output], stddev=stddev_var))
+    W3_logsigma = tf.Variable(tf.truncated_normal([n_hidden_2, n_output], mean=1.0, stddev=stddev_var))
     b3_mu = tf.Variable(tf.zeros([n_output])) 
     b3_logsigma = tf.Variable(tf.zeros([n_output])) 
 
@@ -154,16 +154,18 @@ if __name__ == '__main__':
 
     for n in range(n_epochs):
         errs = []
+	weightVar = []
         for i in xrange(n_train_batches):
-            ob = sess.run([objective, optimize, pi], feed_dict={            
+            ob = sess.run([objective, optimize, pi, W2_logsigma], feed_dict={            
 	    		x: train_data[i * batch_size: (i + 1) * batch_size],
             		y: train_target[i * batch_size: (i + 1) * batch_size],
 			minibatch: n})
             errs.append(ob[0])
+	    weightVar.append(np.mean(ob[3]))
 	    #print ob[2]
     	predictions = sess.run(pred, feed_dict={x: test_data})
 	acc = np.count_nonzero(predictions == np.int32(test_target.ravel())) / float(test_data.shape[0])
-	print acc, np.mean(errs) 
+	print acc, np.mean(errs)#, np.mean(weightVar)
 
 
 

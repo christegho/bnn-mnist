@@ -44,7 +44,7 @@ if __name__ == '__main__':
     n_input = train_data.shape[1]
     M = train_data.shape[0]
     sigma_prior = tf.exp(-3.0)
-    n_samples = 1
+    n_samples = 3
     learning_rate = 0.001
     n_epochs = 100
 
@@ -61,7 +61,7 @@ if __name__ == '__main__':
     # L2
     n_hidden_2 = 200
     W2_mu = tf.Variable(tf.truncated_normal([n_hidden_1, n_hidden_2], stddev=stddev_var))
-    W2_logsigma = tf.Variable(tf.truncated_normal([n_hidden_1, n_hidden_2], stddev=stddev_var))
+    W2_logsigma = tf.Variable(tf.truncated_normal([n_hidden_1, n_hidden_2], mean=2.0, stddev=1.0))
     b2_mu = tf.Variable(tf.zeros([n_hidden_2])) 
     b2_logsigma = tf.Variable(tf.zeros([n_hidden_2])) 
 
@@ -154,16 +154,18 @@ if __name__ == '__main__':
 
     for n in range(n_epochs):
         errs = []
+	weightVar = []
         for i in xrange(n_train_batches):
-            ob = sess.run([objective, optimize, pi], feed_dict={            
+            ob = sess.run([objective, optimize, pi, W2_logsigma], feed_dict={            
 	    		x: train_data[i * batch_size: (i + 1) * batch_size],
             		y: train_target[i * batch_size: (i + 1) * batch_size],
 			minibatch: n})
             errs.append(ob[0])
+	    weightVar.append(np.mean(ob[3]))
 	    #print ob[2]
     	predictions = sess.run(pred, feed_dict={x: test_data})
 	acc = np.count_nonzero(predictions == np.int32(test_target.ravel())) / float(test_data.shape[0])
-	print acc, np.mean(errs) 
+	print acc, np.mean(errs)#, np.mean(weightVar)
 
 
 
