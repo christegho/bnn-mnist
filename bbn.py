@@ -44,6 +44,7 @@ if __name__ == '__main__':
     n_input = train_data.shape[1]
     M = train_data.shape[0]
     sigma_prior = tf.exp(-5.0)
+    epsilon_prior = 0.1
     n_samples = 1
     learning_rate = 0.001
     n_epochs = 100
@@ -76,20 +77,20 @@ if __name__ == '__main__':
 
     for _ in xrange(n_samples):
 
-        epsilon_w1 = get_random((n_input, n_hidden_1), avg=0., std=sigma_prior)
-        epsilon_b1 = get_random((n_hidden_1,), avg=0., std=sigma_prior)
+        epsilon_w1 = get_random((n_input, n_hidden_1), avg=0., std=epsilon_prior)
+        epsilon_b1 = get_random((n_hidden_1,), avg=0., std=epsilon_prior)
 
         W1 = W1_mu + tf.mul(tf.log(1. + tf.exp(W1_logsigma)), epsilon_w1)
         b1 = b1_mu + tf.mul(tf.log(1. + tf.exp(b1_logsigma)), epsilon_b1)
 
-        epsilon_w2 = get_random((n_hidden_1, n_hidden_2), avg=0., std=sigma_prior)
-        epsilon_b2 = get_random((n_hidden_2,), avg=0., std=sigma_prior)
+        epsilon_w2 = get_random((n_hidden_1, n_hidden_2), avg=0., std=epsilon_prior)
+        epsilon_b2 = get_random((n_hidden_2,), avg=0., std=epsilon_prior)
 
         W2 = W2_mu + tf.mul(tf.log(1. + tf.exp(W2_logsigma)), epsilon_w2)
         b2 = b2_mu + tf.mul(tf.log(1. + tf.exp(b2_logsigma)), epsilon_b2)
 
-        epsilon_w3 = get_random((n_hidden_2, n_output), avg=0., std=sigma_prior)
-        epsilon_b3 = get_random((n_output,), avg=0., std=sigma_prior)
+        epsilon_w3 = get_random((n_hidden_2, n_output), avg=0., std=epsilon_prior)
+        epsilon_b3 = get_random((n_output,), avg=0., std=epsilon_prior)
 
         W3 = W3_mu + tf.mul(tf.log(1. + tf.exp(W3_logsigma)), epsilon_w3)
         b3 = b3_mu + tf.mul(tf.log(1. + tf.exp(b3_logsigma)), epsilon_b3)
