@@ -25,7 +25,7 @@ def get_random(shape, avg, std):
 if __name__ == '__main__':
     mnist = fetch_mldata('MNIST original')
     # prepare data
-    N = 20000
+    N = 30000
 
     data = np.float32(mnist.data[:]) / 255.
     idx = np.random.choice(data.shape[0], N)
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     M = train_data.shape[0]
     sigma_prior = tf.exp(-5.0)
     epsilon_prior = 0.001
-    n_samples = 3
+    n_samples = 1
     learning_rate = 0.001
     n_epochs = 100
 
