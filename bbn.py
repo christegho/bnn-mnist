@@ -43,8 +43,8 @@ if __name__ == '__main__':
     y = tf.placeholder(tf.float32, shape = None, name = 'y')
     n_input = train_data.shape[1]
     M = train_data.shape[0]
-    sigma_prior = tf.exp(-3.0)
-    n_samples = 3
+    sigma_prior = tf.exp(-5.0)
+    n_samples = 1
     learning_rate = 0.001
     n_epochs = 100
 
