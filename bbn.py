@@ -16,7 +16,7 @@ def log_gaussian(x, mu, sigma):
     return -0.5 * np.log(2 * np.pi) - tf.log(tf.abs(sigma)) - (x - mu) ** 2 / (2 * sigma ** 2)
 
 def log_gaussian_logsigma(x, mu, logsigma):
-    return -0.5 * np.log(2 * np.pi) - logsigma / 2. - (x - mu) ** 2 / (2. * tf.exp(logsigma))
+    return -0.5 * np.log(2 * np.pi) - logsigma - (x - mu) ** 2 / (2. * tf.exp(logsigma)**2.)
 
 def get_random(shape, avg, std):
     return tf.random_normal(shape, mean=avg, stddev=std)
@@ -25,7 +25,7 @@ def get_random(shape, avg, std):
 if __name__ == '__main__':
     mnist = fetch_mldata('MNIST original')
     # prepare data
-    N = 5000
+    N = 20000
 
     data = np.float32(mnist.data[:]) / 255.
     idx = np.random.choice(data.shape[0], N)
@@ -43,8 +43,9 @@ if __name__ == '__main__':
     y = tf.placeholder(tf.float32, shape = None, name = 'y')
     n_input = train_data.shape[1]
     M = train_data.shape[0]
-    sigma_prior = tf.exp(-3.0)
-    n_samples = 1
+    sigma_prior = tf.exp(-5.0)
+    epsilon_prior = 0.001
+    n_samples = 3
     learning_rate = 0.001
     n_epochs = 100
 
@@ -76,20 +77,20 @@ if __name__ == '__main__':
 
     for _ in xrange(n_samples):
 
-        epsilon_w1 = get_random((n_input, n_hidden_1), avg=0., std=sigma_prior)
-        epsilon_b1 = get_random((n_hidden_1,), avg=0., std=sigma_prior)
+        epsilon_w1 = get_random((n_input, n_hidden_1), avg=0., std=epsilon_prior)
+        epsilon_b1 = get_random((n_hidden_1,), avg=0., std=epsilon_prior)
 
         W1 = W1_mu + tf.mul(tf.log(1. + tf.exp(W1_logsigma)), epsilon_w1)
         b1 = b1_mu + tf.mul(tf.log(1. + tf.exp(b1_logsigma)), epsilon_b1)
 
-        epsilon_w2 = get_random((n_hidden_1, n_hidden_2), avg=0., std=sigma_prior)
-        epsilon_b2 = get_random((n_hidden_2,), avg=0., std=sigma_prior)
+        epsilon_w2 = get_random((n_hidden_1, n_hidden_2), avg=0., std=epsilon_prior)
+        epsilon_b2 = get_random((n_hidden_2,), avg=0., std=epsilon_prior)
 
         W2 = W2_mu + tf.mul(tf.log(1. + tf.exp(W2_logsigma)), epsilon_w2)
         b2 = b2_mu + tf.mul(tf.log(1. + tf.exp(b2_logsigma)), epsilon_b2)
 
-        epsilon_w3 = get_random((n_hidden_2, n_output), avg=0., std=sigma_prior)
-        epsilon_b3 = get_random((n_output,), avg=0., std=sigma_prior)
+        epsilon_w3 = get_random((n_hidden_2, n_output), avg=0., std=epsilon_prior)
+        epsilon_b3 = get_random((n_output,), avg=0., std=epsilon_prior)
 
         W3 = W3_mu + tf.mul(tf.log(1. + tf.exp(W3_logsigma)), epsilon_w3)
         b3 = b3_mu + tf.mul(tf.log(1. + tf.exp(b3_logsigma)), epsilon_b3)
@@ -110,9 +111,9 @@ if __name__ == '__main__':
             sample_log_pw += tf.reduce_sum(log_gaussian(b, 0., sigma_prior))
 
             # then approximation
-            sample_log_qw += tf.reduce_sum(log_gaussian_logsigma(W, W_mu, W_logsigma * 2))
+            sample_log_qw += tf.reduce_sum(log_gaussian_logsigma(W, W_mu, W_logsigma*2))
             # sample_log_qw += tf.reduce_sum(log_gaussian(W, W_mu, tf.log(1. + tf.exp(W_logsigma))))
-            sample_log_qw += tf.reduce_sum(log_gaussian_logsigma(b, b_mu, b_logsigma * 2))
+            sample_log_qw += tf.reduce_sum(log_gaussian_logsigma(b, b_mu, b_logsigma*2))
             # sample_log_qw += tf.reduce_sum(log_gaussian(b, b_mu, tf.log(1. + tf.exp(b_logsigma))))
 
         # then the likelihood
@@ -129,12 +130,12 @@ if __name__ == '__main__':
     log_likelihood /= n_samples
 
     batch_size = 100
-    n_batches = M / float(batch_size)
+    n_batches = N / float(batch_size)
     n_train_batches = int(train_data.shape[0] / float(batch_size))
     minibatch = tf.placeholder(tf.float32, shape = None, name = 'minibatch')
     #pi = (2**(n_epochs-minibatch-1))/(2**n_epochs - 1 )
-    # pi = (1. / n_batches)
-    pi = (1. / float(batch_size))
+    pi = (1. / n_batches)
+    # pi = (1. / float(batch_size))
     objective = tf.reduce_sum(pi * (log_qw - log_pw)) - log_likelihood / float(batch_size)
     
     # updates
