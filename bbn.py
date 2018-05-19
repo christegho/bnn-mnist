@@ -16,7 +16,7 @@ def log_gaussian(x, mu, sigma):
     return -0.5 * np.log(2 * np.pi) - tf.log(tf.abs(sigma)) - (x - mu) ** 2 / (2 * sigma ** 2)
 
 def log_gaussian_logsigma(x, mu, logsigma):
-    return -0.5 * np.log(2 * np.pi) - logsigma / 2. - (x - mu) ** 2 / (2. * tf.exp(logsigma))
+    return -0.5 * np.log(2 * np.pi) - logsigma - (x - mu) ** 2 / (2. * tf.exp(logsigma)**2.)
 
 def get_random(shape, avg, std):
     return tf.random_normal(shape, mean=avg, stddev=std)
@@ -25,7 +25,7 @@ def get_random(shape, avg, std):
 if __name__ == '__main__':
     mnist = fetch_mldata('MNIST original')
     # prepare data
-    N = 5000
+    N = 20000
 
     data = np.float32(mnist.data[:]) / 255.
     idx = np.random.choice(data.shape[0], N)
@@ -48,27 +48,26 @@ if __name__ == '__main__':
     learning_rate = 0.001
     n_epochs = 100
 
-    stddev_var = 0.1
-
+    stddev_var = 1.0
     # weights
     # L1
     n_hidden_1 = 200
     W1_mu = tf.Variable(tf.truncated_normal([n_input, n_hidden_1], stddev=stddev_var))
-    W1_logsigma = tf.Variable(tf.truncated_normal([n_input, n_hidden_1], mean=1.0, stddev=stddev_var)) 
+    W1_logsigma = tf.Variable(tf.truncated_normal([n_input, n_hidden_1], mean=0.0, stddev=stddev_var)) 
     b1_mu = tf.Variable(tf.zeros([n_hidden_1])) #CHRIS can change
     b1_logsigma = tf.Variable(tf.zeros([n_hidden_1]))
 
     # L2
     n_hidden_2 = 200
     W2_mu = tf.Variable(tf.truncated_normal([n_hidden_1, n_hidden_2], stddev=stddev_var))
-    W2_logsigma = tf.Variable(tf.truncated_normal([n_hidden_1, n_hidden_2], mean=1.0, stddev=stddev_var))
+    W2_logsigma = tf.Variable(tf.truncated_normal([n_hidden_1, n_hidden_2], mean=0.0, stddev=stddev_var))
     b2_mu = tf.Variable(tf.zeros([n_hidden_2])) 
     b2_logsigma = tf.Variable(tf.zeros([n_hidden_2])) 
 
     # L3
     n_output = 10
     W3_mu = tf.Variable(tf.truncated_normal([n_hidden_2, n_output], stddev=stddev_var))
-    W3_logsigma = tf.Variable(tf.truncated_normal([n_hidden_2, n_output], mean=1.0, stddev=stddev_var))
+    W3_logsigma = tf.Variable(tf.truncated_normal([n_hidden_2, n_output], mean=0.0, stddev=stddev_var))
     b3_mu = tf.Variable(tf.zeros([n_output])) 
     b3_logsigma = tf.Variable(tf.zeros([n_output])) 
 
@@ -111,12 +110,16 @@ if __name__ == '__main__':
             sample_log_pw += tf.reduce_sum(log_gaussian(b, 0., sigma_prior))
 
             # then approximation
-            sample_log_qw += tf.reduce_sum(log_gaussian_logsigma(W, W_mu, W_logsigma * 2))
-            sample_log_qw += tf.reduce_sum(log_gaussian_logsigma(b, b_mu, b_logsigma * 2))
+            sample_log_qw += tf.reduce_sum(log_gaussian_logsigma(W, W_mu, W_logsigma*2))
+            # sample_log_qw += tf.reduce_sum(log_gaussian(W, W_mu, tf.log(1. + tf.exp(W_logsigma))))
+            sample_log_qw += tf.reduce_sum(log_gaussian_logsigma(b, b_mu, b_logsigma*2))
+            # sample_log_qw += tf.reduce_sum(log_gaussian(b, b_mu, tf.log(1. + tf.exp(b_logsigma))))
 
         # then the likelihood
         sample_log_likelihood = tf.reduce_sum(log_gaussian(y, h, sigma_prior))
-
+        # sample_log_likelihood = -(y - h)**2
+        # sample_log_likelihood = tf.reduce_sum(sample_log_likelihood)
+        
         log_pw += sample_log_pw
         log_qw += sample_log_qw
         log_likelihood += sample_log_likelihood
@@ -126,13 +129,13 @@ if __name__ == '__main__':
     log_likelihood /= n_samples
 
     batch_size = 100
-    n_batches = M / float(batch_size)
+    n_batches = N / float(batch_size)
     n_train_batches = int(train_data.shape[0] / float(batch_size))
     minibatch = tf.placeholder(tf.float32, shape = None, name = 'minibatch')
     #pi = (2**(n_epochs-minibatch-1))/(2**n_epochs - 1 )
-    pi = (2**(n_batches-minibatch-1))/(2**n_batches - 1 )
-    #pi = (1. / n_batches)
-    objective = tf.reduce_sum(pi * (log_qw - log_pw) - log_likelihood) / float(batch_size)
+    pi = (1. / n_batches)
+    # pi = (1. / float(batch_size))
+    objective = tf.reduce_sum(pi * (log_qw - log_pw)) - log_likelihood / float(batch_size)
     
     # updates
     optimizer = tf.train.AdamOptimizer(learning_rate)
@@ -154,18 +157,18 @@ if __name__ == '__main__':
 
     for n in range(n_epochs):
         errs = []
-	weightVar = []
+        weightVar = []
         for i in xrange(n_train_batches):
-            ob = sess.run([objective, optimize, pi, W2_logsigma], feed_dict={            
-	    		x: train_data[i * batch_size: (i + 1) * batch_size],
-            		y: train_target[i * batch_size: (i + 1) * batch_size],
-			minibatch: n})
+            ob = sess.run([objective, optimize, W2_logsigma], feed_dict={            
+                x: train_data[i * batch_size: (i + 1) * batch_size],
+                y: train_target[i * batch_size: (i + 1) * batch_size],
+                minibatch: n})
             errs.append(ob[0])
-	    weightVar.append(np.mean(ob[3]))
-	    #print ob[2]
-    	predictions = sess.run(pred, feed_dict={x: test_data})
-	acc = np.count_nonzero(predictions == np.int32(test_target.ravel())) / float(test_data.shape[0])
-	print acc, np.mean(errs)#, np.mean(weightVar)
+            weightVar.append(np.mean(ob[2]))
+            #print ob[2]
+            predictions = sess.run(pred, feed_dict={x: test_data})
+        acc = np.count_nonzero(predictions == np.int32(test_target.ravel())) / float(test_data.shape[0])
+        print acc, np.mean(errs)#, np.mean(weightVar)
 
 
 
