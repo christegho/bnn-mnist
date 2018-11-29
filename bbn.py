@@ -25,7 +25,7 @@ def get_random(shape, avg, std):
 if __name__ == '__main__':
     mnist = fetch_mldata('MNIST original')
     # prepare data
-    N = 30000
+    N = 50000
 
     data = np.float32(mnist.data[:]) / 255.
     idx = np.random.choice(data.shape[0], N)
@@ -167,7 +167,7 @@ if __name__ == '__main__':
             errs.append(ob[0])
             weightVar.append(np.mean(ob[2]))
             #print ob[2]
-            predictions = sess.run(pred, feed_dict={x: test_data})
+        predictions = sess.run(pred, feed_dict={x: test_data})
         acc = np.count_nonzero(predictions == np.int32(test_target.ravel())) / float(test_data.shape[0])
         print acc, np.mean(errs)#, np.mean(weightVar)
 
