@@ -21,11 +21,16 @@ def log_gaussian_logsigma(x, mu, logsigma):
 def get_random(shape, avg, std):
     return tf.random_normal(shape, mean=avg, stddev=std)
 
+def log_categ(y, y_hat):
+    # First handle very small values in y_hat
+    ll=1e-8;ul=1
+    # y_hat=tf.clip_by_value(y_hat,clip_value_min=ll,clip_value_max=ul)
+    return tf.reduce_sum(tf.multiply(y,tf.log(y_hat)),axis=1)
 
 if __name__ == '__main__':
     mnist = fetch_mldata('MNIST original')
     # prepare data
-    N = 50000
+    N = 30000
 
     data = np.float32(mnist.data[:]) / 255.
     idx = np.random.choice(data.shape[0], N)
@@ -43,13 +48,13 @@ if __name__ == '__main__':
     y = tf.placeholder(tf.float32, shape = None, name = 'y')
     n_input = train_data.shape[1]
     M = train_data.shape[0]
-    sigma_prior = tf.exp(-5.0)
+    sigma_prior = 1.0 #tf.exp(5.0)
     epsilon_prior = 0.001
     n_samples = 1
     learning_rate = 0.001
     n_epochs = 100
 
-    stddev_var = 1.0
+    stddev_var = 0.1
     # weights
     # L1
     n_hidden_1 = 200
@@ -80,20 +85,20 @@ if __name__ == '__main__':
         epsilon_w1 = get_random((n_input, n_hidden_1), avg=0., std=epsilon_prior)
         epsilon_b1 = get_random((n_hidden_1,), avg=0., std=epsilon_prior)
 
-        W1 = W1_mu + tf.mul(tf.log(1. + tf.exp(W1_logsigma)), epsilon_w1)
-        b1 = b1_mu + tf.mul(tf.log(1. + tf.exp(b1_logsigma)), epsilon_b1)
+        W1 = W1_mu + tf.multiply(tf.log(1. + tf.exp(W1_logsigma)), epsilon_w1)
+        b1 = b1_mu + tf.multiply(tf.log(1. + tf.exp(b1_logsigma)), epsilon_b1)
 
         epsilon_w2 = get_random((n_hidden_1, n_hidden_2), avg=0., std=epsilon_prior)
         epsilon_b2 = get_random((n_hidden_2,), avg=0., std=epsilon_prior)
 
-        W2 = W2_mu + tf.mul(tf.log(1. + tf.exp(W2_logsigma)), epsilon_w2)
-        b2 = b2_mu + tf.mul(tf.log(1. + tf.exp(b2_logsigma)), epsilon_b2)
+        W2 = W2_mu + tf.multiply(tf.log(1. + tf.exp(W2_logsigma)), epsilon_w2)
+        b2 = b2_mu + tf.multiply(tf.log(1. + tf.exp(b2_logsigma)), epsilon_b2)
 
         epsilon_w3 = get_random((n_hidden_2, n_output), avg=0., std=epsilon_prior)
         epsilon_b3 = get_random((n_output,), avg=0., std=epsilon_prior)
 
-        W3 = W3_mu + tf.mul(tf.log(1. + tf.exp(W3_logsigma)), epsilon_w3)
-        b3 = b3_mu + tf.mul(tf.log(1. + tf.exp(b3_logsigma)), epsilon_b3)
+        W3 = W3_mu + tf.multiply(tf.log(1. + tf.exp(W3_logsigma)), epsilon_w3)
+        b3 = b3_mu + tf.multiply(tf.log(1. + tf.exp(b3_logsigma)), epsilon_b3)
 
         a1 = nonlinearity(tf.matmul(x, W1) + b1)
         a2 = nonlinearity(tf.matmul(a1, W2) + b2)
@@ -117,7 +122,8 @@ if __name__ == '__main__':
             # sample_log_qw += tf.reduce_sum(log_gaussian(b, b_mu, tf.log(1. + tf.exp(b_logsigma))))
 
         # then the likelihood
-        sample_log_likelihood = tf.reduce_sum(log_gaussian(y, h, sigma_prior))
+        sample_log_likelihood = tf.reduce_sum(log_categ(y, h))
+        #tf.math.reduce_mean(tf.losses.softmax_cross_entropy(y, h)) #tf.reduce_sum(log_gaussian(y, h, sigma_prior))
         # sample_log_likelihood = -(y - h)**2
         # sample_log_likelihood = tf.reduce_sum(sample_log_likelihood)
         
@@ -160,12 +166,13 @@ if __name__ == '__main__':
         errs = []
         weightVar = []
         for i in xrange(n_train_batches):
-            ob = sess.run([objective, optimize, W2_logsigma], feed_dict={            
+            ob = sess.run([objective, optimize, W2_logsigma, h, y, log_likelihood], feed_dict={            
                 x: train_data[i * batch_size: (i + 1) * batch_size],
                 y: train_target[i * batch_size: (i + 1) * batch_size],
                 minibatch: n})
             errs.append(ob[0])
             weightVar.append(np.mean(ob[2]))
+            # import pdb; pdb.set_trace()
             #print ob[2]
         predictions = sess.run(pred, feed_dict={x: test_data})
         acc = np.count_nonzero(predictions == np.int32(test_target.ravel())) / float(test_data.shape[0])
